@@ -1,0 +1,644 @@
+ <!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="utf-8">
+    <title>垃圾不迷路 - 垃圾分類教育與查詢網</title>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+    <style>
+        :root {
+            --primary: #2E7D32;
+            --secondary: #4CAF50;
+            --light: #F1F8E9;
+            --dark: #1b4d1e;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: "Open Sans", sans-serif;
+            color: #555;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: "Jost", sans-serif;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .navbar {
+            background: var(--white) !important;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-brand {
+            color: var(--primary) !important;
+            font-size: 1.8rem;
+            font-weight: 800;
+        }
+
+        .nav-link {
+            color: var(--dark);
+            font-weight: 600;
+            margin-left: 15px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary);
+        }
+
+        .jumbotron {
+            position: relative;
+            margin-bottom: 0;
+            min-height: 90vh;
+            padding: 60px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-color: #333;
+            overflow: hidden;
+        }
+
+        .hero-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            opacity: 0.6;
+        }
+
+        .jumbotron .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .jumbotron h1 {
+            color: var(--white);
+            font-size: 4rem;
+            text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.8);
+        }
+
+        .search-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 50px;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-container input {
+            border: none;
+            flex: 1;
+            padding: 10px 25px;
+            font-size: 1.2rem;
+            outline: none;
+            border-radius: 50px;
+        }
+
+        .search-container button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 10px 40px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .search-container button:hover {
+            background-color: var(--secondary);
+        }
+
+        #search-result {
+            margin-top: 30px;
+            background: var(--white);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: left;
+            display: none;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            border-left: 6px solid var(--primary);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .camera-container {
+            margin-top: 30px;
+        }
+
+        .ai-result-box {
+            background: rgba(255, 255, 255, 0.95);
+            max-width: 400px;
+            margin: 15px auto 0;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats-section { padding: 80px 0; background-color: var(--light); }
+        .stat-item { background: var(--white); padding: 40px 20px; border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.05); height: 100%; text-align: center; transition: 0.3s; }
+        .stat-item:hover { transform: translateY(-5px); }
+        .stat-item h3 { font-size: 2.5rem; color: var(--primary); margin-bottom: 15px; }
+        .problem-section { padding: 80px 0; }
+        .section-title { position: relative; margin-bottom: 40px; display: inline-block; }
+        .section-title::after { content: ""; width: 50px; height: 3px; background: var(--secondary); position: absolute; bottom: -10px; left: 0; }
+        .problem-img img { width: 100%; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); }
+        .design-section { background-color: var(--light); padding: 80px 0; }
+        .design-item { background: var(--white); border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0, 0, 0, 0.08); margin-bottom: 30px; height: 100%; transition: 0.3s; }
+        .design-item:hover { transform: translateY(-5px); }
+        .design-img { height: 250px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 3px solid var(--secondary); padding: 10px; }
+        .design-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .design-img img.cover-fit { object-fit: cover; width: 100%; height: 100%; padding: 0; }
+        .design-text { padding: 25px; text-align: center; }
+        .design-text h4 { margin: 0; font-size: 1.3rem; color: var(--primary); }
+        .motivation-section { padding: 80px 0; background: var(--primary); color: var(--white); }
+        .motivation-box { background: rgba(255, 255, 255, 0.1); padding: 30px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; }
+        .motivation-icon { font-size: 2rem; color: var(--secondary); margin-right: 20px; min-width: 50px; text-align: center; }
+        footer { background: var(--dark); color: rgba(255, 255, 255, 0.7); padding: 30px 0; text-align: center; }
+
+        @media (max-width: 768px) {
+            .jumbotron h1 { font-size: 2.8rem; }
+            .search-container { border-radius: 25px; flex-direction: column; gap: 10px; }
+            .search-container button { width: 100%; }
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a href="#" class="navbar-brand"><i class="fas fa-recycle me-2"></i> 垃圾不迷路</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
+                <span class="fa fa-bars text-primary"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarCollapse">
+                <div class="navbar-nav ms-auto py-0">
+                    <a href="#home" class="nav-item nav-link active">首頁</a>
+                    <a href="#problem" class="nav-item nav-link">問題意識</a>
+                    <a href="#design" class="nav-item nav-link">執行方向</a>
+                    <a href="#motivation" class="nav-item nav-link">研究目的</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="jumbotron" id="home">
+        <img src="https://i.postimg.cc/2bw7SNLY/bg.jpg" class="hero-bg" alt="Background">
+        <div class="container">
+            <h1>垃圾不迷路</h1>
+            <p class="fs-4 text-white mb-5">協助使用者快速判斷垃圾該如何分類與丟棄</p>
+
+            <div class="search-container">
+                <input type="text" id="trashInput" placeholder="請輸入垃圾名稱（例如：寶特瓶、電池、便當盒...）">
+                <button onclick="searchTrash()">搜尋分類</button>
+            </div>
+
+            <div class="camera-container">
+                <button id="start-cam-btn" class="btn btn-warning rounded-pill px-4 py-2 fw-bold shadow">
+                    <i class="fas fa-camera"></i> 開啟鏡頭即時辨識
+                </button>
+
+                <div id="video-wrapper" style="display: none; margin-top: 15px; position: relative; width: 100%; max-width: 400px; margin-left: auto; margin-right: auto;">
+                    <video id="video" autoplay playsinline muted style="width: 100%; border-radius: 15px; border: 4px solid var(--secondary); box-shadow: 0 10px 20px rgba(0,0,0,0.4); transform: scaleX(-1);"></video>
+                    <canvas id="canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); border-radius: 15px; pointer-events: none;"></canvas>
+
+                    <div class="ai-result-box text-start mt-3">
+                        <h5 class="text-primary mb-2"><i class="fas fa-robot"></i> AI 即時偵測中</h5>
+                        <p class="mb-1 text-dark">
+                            <strong>偵測物品：</strong>
+                            <span id="ai-detected-item" class="text-danger">等待辨識...</span>
+                        </p>
+                        <p class="mb-1 text-dark">
+                            <strong>分類建議：</strong>
+                            <span id="ai-category">請將物品對準鏡頭</span>
+                        </p>
+                        <p class="mb-0 text-muted" style="font-size: 0.9rem;" id="ai-method"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="search-result">
+                <h4 id="result-title" class="text-success mb-3"></h4>
+                <p><strong>分類類別：</strong><span id="result-category"></span></p>
+                <p><strong>丟棄方式：</strong><span id="result-method"></span></p>
+                <p id="result-note" class="text-muted fst-italic mt-2"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-section">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="stat-item">
+                        <i class="fas fa-globe-americas fa-3x text-secondary mb-3"></i>
+                        <h3>13.5%</h3>
+                        <p>全球垃圾回收率僅</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-item">
+                        <i class="fas fa-exclamation-triangle fa-3x text-secondary mb-3"></i>
+                        <h3>45%</h3>
+                        <p>台灣垃圾錯誤分類率高達</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-item">
+                        <i class="fas fa-water fa-3x text-secondary mb-3"></i>
+                        <h3>800 萬噸</h3>
+                        <p>塑膠垃圾流入海洋量每年約</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="problem-section" id="problem">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-5 mb-4 mb-lg-0">
+                    <div class="problem-img">
+                        <img src="https://i.postimg.cc/KkND8hkw/about.jpg" alt="分類圖示">
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <h5 class="text-primary text-uppercase mb-3">現況分析</h5>
+                    <h1 class="section-title">為什麼分類不確實</h1>
+                    <p class="fs-5" style="text-align: justify;">
+                        垃圾分類不確實的原因很複雜，主要包括民眾認知不足、各地回收體系規則不一，以及行為和環境因素，導致民眾常有「做得跟沒做一樣」的無力感。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="design-section" id="design">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h5 class="text-primary text-uppercase mb-3">我們的方案</h5>
+                <h1>我們的設計與執行方向</h1>
+                <p>透過多元科技整合，解決分類痛點</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-3 col-md-6">
+                    <div class="design-item">
+                        <div class="design-img"><img src="https://i.postimg.cc/CBNsxpng/ai.jpg" class="cover-fit" alt="AI"></div>
+                        <div class="design-text"><h4>AI 影像辨識</h4></div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="design-item">
+                        <div class="design-img"><img src="https://i.postimg.cc/bDT9wfSp/chat.jpg" alt="Chatbot"></div>
+                        <div class="design-text"><h4>LINE 聊天機器人</h4></div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="design-item">
+                        <div class="design-img"><img src="https://i.postimg.cc/BLgBnfPs/data.jpg" alt="Big Data"></div>
+                        <div class="design-text"><h4>智慧分析數據平台</h4></div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="design-item">
+                        <div class="design-img"><img src="https://i.postimg.cc/JHzcyYZg/map.jpg" alt="Map"></div>
+                        <div class="design-text"><h4>垃圾桶地圖</h4></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="motivation-section" id="motivation">
+        <div class="container">
+            <div class="text-center mb-5"><h1 class="text-white">研究目的與動機</h1></div>
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="motivation-box">
+                        <div class="motivation-icon"><i class="fas fa-question-circle"></i></div>
+                        <div><h4>解決垃圾分類混亂</h4><p class="mb-0">民眾常因各地規則不同而不確定垃圾該如何分類。</p></div>
+                    </div>
+                    <div class="motivation-box">
+                        <div class="motivation-icon"><i class="fas fa-tools"></i></div>
+                        <div><h4>缺乏便利工具</h4><p class="mb-0">目前查詢方式繁瑣，缺少即時、簡單的分類輔助系統。</p></div>
+                    </div>
+                    <div class="motivation-box">
+                        <div class="motivation-icon"><i class="fas fa-seedling"></i></div>
+                        <div><h4>推廣環保意識</h4><p class="mb-0">透過科技輔助，降低分類門檻，培養民眾環保習慣。</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <h3 class="text-white mb-3">垃圾不迷路</h3>
+            <p class="mb-0">&copy; 2026 垃圾不迷路專題小組. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // === 資料庫與手動搜尋邏輯 ===
+        const trashDB = [
+            { keywords: ["寶特瓶", "塑膠瓶", "水瓶", "飲料瓶", "瓶子"], category: "資源回收（塑膠類）", method: "倒空內容物，簡單沖洗，踩扁後回收。", note: "瓶蓋可分開回收，若有油污需清洗乾淨。" },
+            { keywords: ["玻璃瓶", "酒瓶", "玻璃杯", "花瓶"], category: "資源回收（玻璃類）", method: "倒空內容物，瓶蓋分開，依規定回收。", note: "請小心輕放，避免破裂割傷。陶瓷杯通常不可當玻璃回收。" },
+            { keywords: ["杯子", "紙杯", "塑膠杯", "飲料杯", "咖啡杯"], category: "資源回收 / 一般垃圾", method: "若為乾淨塑膠杯或紙容器，清洗後可回收；若油污嚴重則丟一般垃圾。", note: "紙杯內層常有淋膜，不可混入一般紙類。" },
+            { keywords: ["碗", "便當盒", "餐盒", "紙餐盒", "塑膠餐盒", "容器"], category: "資源回收（容器類）", method: "清除廚餘後，用水沖洗，瀝乾再回收。", note: "若油污嚴重或無法清洗乾淨，建議丟一般垃圾。" },
+            { keywords: ["叉子", "湯匙", "刀子", "餐具", "塑膠湯匙", "塑膠叉子"], category: "依材質分類", method: "塑膠餐具若乾淨可回收；金屬餐具可回收；髒污嚴重則丟一般垃圾。", note: "尖銳刀具請先包好，避免清潔人員受傷。" },
+            { keywords: ["鋁罐", "鐵罐", "罐子", "飲料罐", "金屬罐"], category: "資源回收（金屬類）", method: "倒空內容物，稍微沖洗，壓扁後回收。", note: "鋁罐、鐵罐都有很高的回收價值。" },
+            { keywords: ["書本", "課本", "紙類", "影印紙", "考卷", "報紙", "雜誌"], category: "資源回收（紙類）", method: "保持乾燥，移除塑膠封面、膠帶或金屬夾後回收。", note: "油污紙、衛生紙、護貝紙不可混入紙類回收。" },
+            { keywords: ["紙箱", "紙盒", "包裝盒", "紙袋"], category: "資源回收（紙類）", method: "壓平後回收，若有膠帶或塑膠膜請先移除。", note: "沾滿油漬的紙盒不可回收。" },
+            { keywords: ["披薩", "披薩盒", "油膩紙盒"], category: "一般垃圾", method: "若沾滿油漬，直接丟一般垃圾。", note: "乾淨紙盒才可回收，油污會影響紙類再製。" },
+            { keywords: ["衛生紙", "紙巾", "濕紙巾", "紙尿褲"], category: "一般垃圾", method: "直接丟入一般垃圾桶。", note: "用過的衛生紙、濕紙巾、紙尿褲不可回收。" },
+            { keywords: ["塑膠袋", "袋子", "包裝袋"], category: "資源回收 / 一般垃圾", method: "乾淨、單一材質的塑膠袋可回收；髒污或複合材質丟一般垃圾。", note: "洋芋片袋、鋁箔包裝袋通常為一般垃圾。" },
+            { keywords: ["電池", "乾電池", "鈕扣電池", "行動電源"], category: "有害垃圾（資源回收）", method: "取出並與其他垃圾分開，送至超商、學校或清潔隊指定回收點。", note: "嚴禁丟入一般垃圾車，以免造成污染或火災。" },
+            { keywords: ["手機", "滑鼠", "鍵盤", "筆電", "電腦", "電子產品", "遙控器", "電視", "吹風機", "微波爐", "烤箱", "烤麵包機", "冰箱"], category: "資源回收（電子類）", method: "交給資源回收車，或送至指定賣場、學校、清潔隊回收。", note: "若含電池，請先取出電池另外回收。" },
+            { keywords: ["香蕉", "香蕉皮", "蘋果", "蘋果核", "橘子", "橘子皮", "水果", "菜葉", "花椰菜", "紅蘿蔔"], category: "廚餘回收", method: "瀝乾水分後倒入廚餘桶。", note: "果皮、菜葉、剩飯通常可作為廚餘。" },
+            { keywords: ["剩飯", "剩菜", "三明治", "蛋糕", "甜甜圈", "熱狗", "食物", "剩食"], category: "廚餘回收", method: "去除包裝後，瀝乾水分，再倒入廚餘桶。", note: "包裝紙、塑膠袋、竹籤不可混入廚餘。" },
+            { keywords: ["骨頭", "貝殼", "硬殼", "玉米芯"], category: "一般垃圾", method: "直接丟一般垃圾。", note: "大型骨頭、貝殼、硬殼類不適合一般廚餘處理。" },
+            { keywords: ["剪刀"], category: "資源回收（金屬類）", method: "用紙或膠帶包住尖銳處後，再交給資源回收。", note: "避免清潔人員被割傷。" },
+            { keywords: ["牙刷"], category: "一般垃圾", method: "直接丟入一般垃圾桶。", note: "牙刷通常材質複合且體積小，不易回收。" },
+            { keywords: ["雨傘"], category: "一般垃圾 / 可拆解回收", method: "若可拆解，金屬骨架可回收；無法拆解則丟一般垃圾。", note: "壞掉的雨傘常因材質複合，分類較困難。" },
+            { keywords: ["背包", "包包", "手提包", "行李箱"], category: "一般垃圾 / 大型垃圾", method: "小型包包可丟一般垃圾；大型行李箱建議詢問清潔隊或預約大型垃圾清運。", note: "若還能使用，可優先捐贈或二手利用。" },
+            { keywords: ["玩偶", "娃娃", "泰迪熊"], category: "一般垃圾", method: "直接丟一般垃圾；大型玩偶可依地方規定處理。", note: "若狀況良好，可捐贈或二手交換。" },
+            { keywords: ["衣服", "褲子", "布料", "領帶"], category: "舊衣回收 / 一般垃圾", method: "乾淨可穿的衣物可投入舊衣回收箱；髒污破損嚴重則丟一般垃圾。", note: "請保持乾燥，避免發霉。" },
+            { keywords: ["球", "籃球", "足球", "網球", "棒球", "球拍"], category: "一般垃圾", method: "破損球類通常丟一般垃圾。", note: "不同材質混合，通常不容易回收。" },
+            { keywords: ["盆栽", "植物"], category: "廚餘 / 一般垃圾 / 資源回收", method: "植物本體可依規定作為廚餘或一般垃圾；塑膠盆清潔後可回收。", note: "土壤不可大量倒入廚餘桶。" },
+            { keywords: ["椅子", "桌子", "家具", "沙發", "床"], category: "大型垃圾", method: "請依地方政府規定預約大型垃圾清運。", note: "不要直接丟在路邊，避免違規。" }
+        ];
+
+        function searchTrash() {
+            const input = document.getElementById("trashInput").value.trim();
+            const resultBox = document.getElementById("search-result");
+            const title = document.getElementById("result-title");
+            const category = document.getElementById("result-category");
+            const method = document.getElementById("result-method");
+            const note = document.getElementById("result-note");
+
+            if (!input) {
+                alert("請輸入垃圾名稱！");
+                return;
+            }
+
+            let found = false;
+
+            for (let item of trashDB) {
+                if (item.keywords.some(k => input.includes(k) || k.includes(input))) {
+                    title.innerText = "查詢結果：" + input;
+                    category.innerText = item.category;
+                    method.innerText = item.method;
+                    note.innerText = "💡 貼心提醒：" + item.note;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                title.innerText = "查詢結果：" + input;
+                category.innerText = "一般垃圾 / 需進一步查詢";
+                method.innerText = "若不確定，建議先視為一般垃圾，或詢問清潔隊員、查詢地方政府清潔隊規定。";
+                note.innerText = "💡 系統暫無此項目資料，可再補充到資料庫。";
+            }
+
+            resultBox.style.display = "block";
+        }
+
+        document.getElementById("trashInput").addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+                searchTrash();
+            }
+        });
+
+        // === 保留備用的 Gemini 圖片辨識功能 (改寫為前端 Fetch API 版本) ===
+        // ⚠️ 貼心提醒：如果要把這個專案放上 Firebase 或其他公開平台，
+        // 把 API Key 直接寫在前端會有被盜用的風險，建議上線前還是要把這段移到後端執行！
+        async function identifyTrashImage(base64Data, mimeType) {
+            const apiKey = "請在這裡填入你的_GEMINI_API_KEY"; // ← 請將你的 API Key 填入此處
+            
+            if (!apiKey || apiKey === "請在這裡填入你的_GEMINI_API_KEY") {
+                return {
+                    success: false,
+                    error: "尚未設定 GEMINI_API_KEY。"
+                };
+            }
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            const promptText = 
+                "請仔細辨識這張圖片中的主要物品，判斷它屬於什麼垃圾分類。" +
+                "請嚴格以 JSON 物件格式回傳，不要包含 Markdown 標籤或多餘字串。" +
+                "JSON 格式必須完全符合以下欄位名稱：" +
+                "{" +
+                "\"name\":\"物品名稱\"," +
+                "\"category\":\"分類類別，例如：資源回收-紙類、一般垃圾、廚餘、有害垃圾\"," +
+                "\"method\":\"具體的丟棄處置步驟教學\"," +
+                "\"note\":\"貼心提醒或回收注意事項\"" +
+                "}";
+
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: promptText },
+                        { inlineData: { mimeType: mimeType, data: base64Data } }
+                    ]
+                }],
+                generationConfig: { responseMimeType: "application/json" }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const jsonResult = await response.json();
+
+                if (jsonResult.candidates && jsonResult.candidates.length > 0) {
+                    const aiTextResponse = jsonResult.candidates[0].content.parts[0].text;
+                    return { success: true, data: JSON.parse(aiTextResponse) };
+                }
+
+                return { success: false, error: "AI 無法識別此圖片，請換個角度或換張照片試試。" };
+
+            } catch (e) {
+                return { success: false, error: "系統錯誤：" + e.toString() };
+            }
+        }
+
+        // === 開啟鏡頭與即時 AI 物件偵測邏輯：TensorFlow.js + COCO-SSD ===
+        let objectDetector = null;
+        let isDetecting = false;
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const videoWrapper = document.getElementById('video-wrapper');
+        const startBtn = document.getElementById('start-cam-btn');
+
+        const aiItemText = document.getElementById('ai-detected-item');
+        const aiCategoryText = document.getElementById('ai-category');
+        const aiMethodText = document.getElementById('ai-method');
+
+        const aiDictionary = {
+            "person": "人", "backpack": "背包", "umbrella": "雨傘", "handbag": "手提包", "tie": "領帶", "suitcase": "行李箱",
+            "bottle": "寶特瓶 / 水瓶", "wine glass": "玻璃杯", "cup": "杯子", "fork": "叉子", "knife": "刀子", "spoon": "湯匙", "bowl": "碗 / 容器",
+            "banana": "香蕉", "apple": "蘋果", "sandwich": "三明治", "orange": "橘子", "broccoli": "花椰菜", "carrot": "紅蘿蔔", "hot dog": "熱狗", "pizza": "披薩", "donut": "甜甜圈", "cake": "蛋糕",
+            "chair": "椅子", "couch": "沙發", "potted plant": "盆栽", "bed": "床", "dining table": "餐桌", "toilet": "馬桶",
+            "tv": "電視", "laptop": "筆電", "mouse": "滑鼠", "remote": "遙控器", "keyboard": "鍵盤", "cell phone": "手機", "microwave": "微波爐", "oven": "烤箱", "toaster": "烤麵包機", "sink": "水槽", "refrigerator": "冰箱",
+            "book": "書本", "clock": "時鐘", "vase": "花瓶", "scissors": "剪刀", "teddy bear": "玩偶", "hair drier": "吹風機", "toothbrush": "牙刷",
+            "sports ball": "球", "baseball bat": "球棒", "baseball glove": "棒球手套", "skateboard": "滑板", "tennis racket": "網球拍"
+        };
+
+        const aiKeywordMap = {
+            "backpack": "背包", "umbrella": "雨傘", "handbag": "手提包", "tie": "領帶", "suitcase": "行李箱",
+            "bottle": "寶特瓶", "wine glass": "玻璃杯", "cup": "杯子", "fork": "餐具", "knife": "餐具", "spoon": "餐具", "bowl": "碗",
+            "banana": "香蕉", "apple": "蘋果", "sandwich": "三明治", "orange": "橘子", "broccoli": "花椰菜", "carrot": "紅蘿蔔", "hot dog": "熱狗", "pizza": "披薩", "donut": "甜甜圈", "cake": "蛋糕",
+            "chair": "椅子", "couch": "家具", "potted plant": "盆栽", "bed": "家具", "dining table": "家具",
+            "tv": "電視", "laptop": "筆電", "mouse": "滑鼠", "remote": "遙控器", "keyboard": "鍵盤", "cell phone": "手機", "microwave": "微波爐", "oven": "烤箱", "toaster": "烤麵包機", "refrigerator": "冰箱", "hair drier": "吹風機",
+            "book": "書本", "vase": "花瓶", "scissors": "剪刀", "teddy bear": "玩偶", "toothbrush": "牙刷",
+            "sports ball": "球", "baseball bat": "球", "baseball glove": "球", "skateboard": "滑板", "tennis racket": "球拍"
+        };
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                videoWrapper.style.display = 'block';
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在開啟鏡頭...';
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false
+                });
+
+                video.srcObject = stream;
+
+                await new Promise(resolve => {
+                    video.onloadedmetadata = () => { video.play(); resolve(); };
+                });
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                aiItemText.innerText = "正在載入 AI 物件偵測模型，請稍候...";
+                aiCategoryText.innerText = "模型載入中";
+                aiMethodText.innerText = "";
+
+                objectDetector = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
+
+                aiItemText.innerText = "✅ AI 模型載入完成，開始偵測";
+                aiCategoryText.innerText = "請將物品對準鏡頭";
+                aiMethodText.innerText = "";
+
+                startBtn.style.display = 'none';
+                isDetecting = true;
+                detectFrame();
+
+            } catch (err) {
+                console.error(err);
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-camera"></i> 開啟鏡頭即時辨識';
+                alert("無法開啟相機，請確認瀏覽器相機權限，並使用 HTTPS 網址開啟。\n錯誤訊息：" + err.message);
+            }
+        });
+
+        async function detectFrame() {
+            if (!objectDetector || !isDetecting) return;
+
+            try {
+                const predictions = await objectDetector.detect(video);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const validObjects = predictions.filter(item => item.score >= 0.35).sort((a, b) => b.score - a.score);
+
+                if (validObjects.length > 0) {
+                    validObjects.forEach(object => drawDetectionBox(object));
+                    const bestObject = validObjects[0];
+                    updateAIResult(bestObject);
+                } else {
+                    aiItemText.innerText = "未偵測到明顯物品...";
+                    aiCategoryText.innerHTML = "請將物品清楚放在鏡頭前";
+                    aiMethodText.innerText = "";
+                }
+            } catch (error) {
+                console.error("AI 偵測錯誤：", error);
+                aiItemText.innerText = "AI 偵測發生錯誤";
+                aiCategoryText.innerText = "請重新整理頁面後再試";
+                aiMethodText.innerText = error.message;
+            }
+
+            requestAnimationFrame(detectFrame);
+        }
+
+        function drawDetectionBox(object) {
+            const [x, y, width, height] = object.bbox;
+            const label = object.class;
+            const score = Math.round(object.score * 100);
+            const chineseLabel = aiDictionary[label] || label;
+
+            ctx.beginPath();
+            ctx.rect(x, y, width, height);
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.closePath();
+
+            ctx.fillStyle = '#00AA00';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText(`${chineseLabel} ${score}%`, x, y > 25 ? y - 8 : y + 25);
+        }
+
+        function updateAIResult(object) {
+            const rawLabel = object.class;
+            const score = Math.round(object.score * 100);
+            const chineseLabel = aiDictionary[rawLabel] || rawLabel;
+
+            aiItemText.innerText = `${chineseLabel}，確信度：${score}%`;
+
+            if (rawLabel === "person") {
+                aiCategoryText.innerHTML = `<span class="badge bg-info fs-6">非垃圾物件</span>`;
+                aiMethodText.innerText = "目前偵測到人，請將鏡頭對準垃圾或物品。";
+                return;
+            }
+
+            const keyword = aiKeywordMap[rawLabel] || chineseLabel;
+            let foundInDB = false;
+
+            for (let item of trashDB) {
+                if (item.keywords.some(k => keyword.includes(k) || k.includes(keyword))) {
+                    aiCategoryText.innerHTML = `<span class="badge bg-success fs-6">${item.category}</span>`;
+                    aiMethodText.innerText = item.method + " " + item.note;
+                    foundInDB = true;
+                    break;
+                }
+            }
+
+            if (!foundInDB) {
+                aiCategoryText.innerHTML = `<span class="badge bg-secondary fs-6">一般垃圾 / 需進一步確認</span>`;
+                aiMethodText.innerText = `AI 偵測到「${chineseLabel}」，但資料庫尚未有完整分類，建議使用上方搜尋欄查詢。`;
+            }
+        }
+    </script>
+</body>
+
+</html>
